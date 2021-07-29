@@ -71,7 +71,7 @@ def save_checkpoint(dir, epoch=None, name='checkpoint', **kwargs):
     torch.save(state, filepath)
 
 
-def train_epoch(loader, model, criterion, optimizer, cuda=True, regression=False, verbose=False, subset=None):
+def train_epoch(loader, model, criterion, optimizer, scheduler = None, cuda=True, regression=False, verbose=False, subset=None):
     loss_sum = 0.0
     stats_sum = defaultdict(float)
     correct = 0.0
@@ -99,7 +99,8 @@ def train_epoch(loader, model, criterion, optimizer, cuda=True, regression=False
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-            
+        if scheduler is not None:
+            scheduler.step()
         loss_sum += loss.data.item() * input.size(0)
         for key, value in stats.items():
             stats_sum[key] += value * input.size(0)
