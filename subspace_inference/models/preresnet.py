@@ -3,11 +3,14 @@
     ported from https://github.com/bearpaw/pytorch-classification/blob/master/models/cifar/preresnet.py
 """
 
-import torch.nn as nn
-import torchvision.transforms as transforms
 import math
 
-__all__ = ['PreResNet110', 'PreResNet56', 'PreResNet8', 'PreResNet83', 'PreResNet164']
+import torch.nn as nn
+import torchvision.transforms as transforms
+from pytorchcv.model_provider import get_model
+from torch.nn.utils import spectral_norm
+
+__all__ = ['PreResNet110', 'PreResNet56', 'PreResNet8', 'PreResNet83', 'PreResNet164', 'PretrainedCIFARModel']
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -149,6 +152,7 @@ class PreResNet(nn.Module):
 
         return x
 
+
 class PreResNet164:
     base = PreResNet
     args = list()
@@ -165,6 +169,7 @@ class PreResNet164:
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
+
 
 class PreResNet110:
     base = PreResNet
@@ -183,6 +188,7 @@ class PreResNet110:
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
 
+
 class PreResNet83:
     base = PreResNet
     args = list()
@@ -197,6 +203,7 @@ class PreResNet83:
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
+
 
 class PreResNet56:
     base = PreResNet
@@ -215,6 +222,7 @@ class PreResNet56:
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
 
+
 class PreResNet8:
     base = PreResNet
     args = list()
@@ -228,6 +236,39 @@ class PreResNet8:
     ])
     transform_test = transforms.Compose([
         transforms.Resize(32),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
+
+
+def add_sn(m):
+    if isinstance(m, (nn.Conv2d, nn.Linear)):
+        return spectral_norm(m, n_power_iterations=3)
+    else:
+        return m
+
+
+class MyPretrainedModel(nn.Module):
+    def __init__(self, name, pretrained, spec_norm):
+        super(MyPretrainedModel, self).__init__()
+        self.model = get_model(name=name, pretrained=pretrained)
+        if spec_norm:
+            self.model.apply(add_sn)
+
+    def forward(self, x):
+        return self.model(x)
+
+
+class PretrainedCIFARModel:
+    base = MyPretrainedModel
+    args = list()
+    kwargs = {'name': "resnet20_cifar10", 'pretrained': True, 'spec_norm': True}
+    transform_train = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
+    transform_test = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])

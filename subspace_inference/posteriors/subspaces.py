@@ -7,11 +7,10 @@
 
 import abc
 
-import torch
 import numpy as np
-
+import torch
 from sklearn.decomposition import TruncatedSVD
-from sklearn.decomposition.pca import _assess_dimension_
+from sklearn.decomposition._pca import _assess_dimension
 from sklearn.utils.extmath import randomized_svd
 
 
@@ -23,6 +22,7 @@ class Subspace(torch.nn.Module, metaclass=abc.ABCMeta):
         def decorator(subclass):
             cls.subclasses[subspace_type] = subclass
             return subclass
+
         return decorator
 
     @classmethod
@@ -63,7 +63,7 @@ class RandomSpace(Subspace):
     # random subspace is independent of data
     def collect_vector(self, vector):
         pass
-    
+
     def get_space(self):
         return self.subspace
 
@@ -107,7 +107,7 @@ class PCASpace(CovarianceSpace):
         super(PCASpace, self).__init__(num_parameters, max_rank=max_rank)
 
         # better phrasing for this condition?
-        assert(pca_rank == 'mle' or isinstance(pca_rank, int))
+        assert (pca_rank == 'mle' or isinstance(pca_rank, int))
         if pca_rank != 'mle':
             assert 1 <= pca_rank <= max_rank
 
@@ -118,7 +118,7 @@ class PCASpace(CovarianceSpace):
         cov_mat_sqrt_np = self.cov_mat_sqrt.clone().numpy()
 
         # perform PCA on DD'
-        cov_mat_sqrt_np /= (max(1, self.rank.item() - 1))**0.5
+        cov_mat_sqrt_np /= (max(1, self.rank.item() - 1)) ** 0.5
 
         if self.pca_rank == 'mle':
             pca_rank = self.rank.item()
@@ -142,11 +142,11 @@ class PCASpace(CovarianceSpace):
                 # secondary correction term based on the rank of the matrix + degrees of freedom
                 m = cov_mat_sqrt_np.shape[1] * rank - rank * (rank + 1) / 2.
                 correction[rank] = 0.5 * m * np.log(cov_mat_sqrt_np.shape[0])
-                ll[rank] = _assess_dimension_(spectrum=eigs,
-                                              rank=rank,
-                                              n_features=min(cov_mat_sqrt_np.shape),
-                                              n_samples=max(cov_mat_sqrt_np.shape))
-            
+                ll[rank] = _assess_dimension(spectrum=eigs,
+                                             rank=rank,
+                                             n_features=min(cov_mat_sqrt_np.shape),
+                                             n_samples=max(cov_mat_sqrt_np.shape))
+
             self.ll = ll
             self.corrected_ll = ll - correction
             self.pca_rank = np.nanargmax(self.corrected_ll)
