@@ -1,16 +1,13 @@
 import itertools
-import torch
 import os
-import copy
-from datetime import datetime
-import math
-import numpy as np
-import tqdm
+import sys
 from collections import defaultdict
 from time import gmtime, strftime
-import sys
 
+import numpy as np
+import torch
 import torch.nn.functional as F
+import tqdm
 
 
 def get_logging_print(fname):
@@ -30,7 +27,7 @@ def get_logging_print(fname):
 
 
 def flatten(lst):
-    tmp = [i.contiguous().view(-1,1) for i in lst]
+    tmp = [i.contiguous().view(-1, 1) for i in lst]
     return torch.cat(tmp).view(-1)
 
 
@@ -38,18 +35,18 @@ def unflatten_like(vector, likeTensorList):
     # Takes a flat torch.tensor and unflattens it to a list of torch.tensors
     #    shaped like likeTensorList
     outList = []
-    i=0
+    i = 0
     for tensor in likeTensorList:
-        #n = module._parameters[name].numel()
+        # n = module._parameters[name].numel()
         n = tensor.numel()
-        outList.append(vector[:,i:i+n].view(tensor.shape))
-        i+=n
+        outList.append(vector[:, i:i + n].view(tensor.shape))
+        i += n
     return outList
 
 
-def LogSumExp(x,dim=0):
-    m,_ = torch.max(x,dim=dim,keepdim=True)
-    return m + torch.log((x - m).exp().sum(dim=dim,keepdim=True))
+def LogSumExp(x, dim=0):
+    m, _ = torch.max(x, dim=dim, keepdim=True)
+    return m + torch.log((x - m).exp().sum(dim=dim, keepdim=True))
 
 
 def adjust_learning_rate(optimizer, lr):
@@ -63,15 +60,16 @@ def save_checkpoint(dir, epoch=None, name='checkpoint', **kwargs):
         'epoch': epoch,
     }
     if epoch is not None:
-       name = '%s-%d.pt' % (name, epoch)
+        name = '%s-%d.pt' % (name, epoch)
     else:
-       name = '%s.pt' % (name)
+        name = '%s.pt' % (name)
     state.update(kwargs)
     filepath = os.path.join(dir, name)
     torch.save(state, filepath)
 
 
-def train_epoch(loader, model, criterion, optimizer, scheduler = None, cuda=True, regression=False, verbose=False, subset=None):
+def train_epoch(loader, model, criterion, optimizer, scheduler=None, cuda=True, regression=False, verbose=False,
+                subset=None):
     loss_sum = 0.0
     stats_sum = defaultdict(float)
     correct = 0.0
@@ -95,7 +93,7 @@ def train_epoch(loader, model, criterion, optimizer, scheduler = None, cuda=True
             target = target.cuda(non_blocking=True)
 
         loss, output, stats = criterion(model, input, target)
-        
+
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -117,7 +115,7 @@ def train_epoch(loader, model, criterion, optimizer, scheduler = None, cuda=True
                 correct / num_objects_current * 100.0
             ))
             verb_stage += 1
-    
+
     return {
         'loss': loss_sum / num_objects_current,
         'accuracy': None if regression else correct / num_objects_current * 100.0,
@@ -229,6 +227,7 @@ def bn_update(loader, model, verbose=False, subset=None, **kwargs):
     if not check_bn(model):
         return
     model.train()
+    device = model.model_device
     momenta = {}
     model.apply(reset_bn)
     model.apply(lambda module: _get_momenta(module, momenta))
@@ -243,7 +242,8 @@ def bn_update(loader, model, verbose=False, subset=None, **kwargs):
             loader = tqdm.tqdm(loader, total=num_batches)
 
         for input, _ in loader:
-            input = input.cuda(non_blocking=True)
+            if device != 'cpu':
+                input = input.cuda(non_blocking=True)
             input_var = torch.autograd.Variable(input)
             b = input_var.data.size(0)
 
@@ -257,13 +257,13 @@ def bn_update(loader, model, verbose=False, subset=None, **kwargs):
     model.apply(lambda module: _set_momenta(module, momenta))
 
 
-def inv_softmax(x, eps = 1e-10):
-    return torch.log(x/(1.0 - x + eps))
+def inv_softmax(x, eps=1e-10):
+    return torch.log(x / (1.0 - x + eps))
 
 
 def predictions(test_loader, model, seed=None, cuda=True, regression=False, **kwargs):
-    #will assume that model is already in eval mode
-    #model.eval()
+    # will assume that model is already in eval mode
+    # model.eval()
     preds = []
     targets = []
     for input, target in test_loader:
@@ -299,21 +299,23 @@ def set_weights(model, vector, device=None):
         param.data.copy_(vector[offset:offset + param.numel()].view(param.size()).to(device))
         offset += param.numel()
 
+
 def extract_parameters(model):
-    params = []	
-    for module in model.modules():	
-        for name in list(module._parameters.keys()):	
-            if module._parameters[name] is None:	
-                continue	
-            param = module._parameters[name]	
-            params.append((module, name, param.size()))	
-            module._parameters.pop(name)	
+    params = []
+    for module in model.modules():
+        for name in list(module._parameters.keys()):
+            if module._parameters[name] is None:
+                continue
+            param = module._parameters[name]
+            params.append((module, name, param.size()))
+            module._parameters.pop(name)
     return params
 
-def set_weights_old(params, w, device):	
+
+def set_weights_old(params, w, device):
     offset = 0
     for module, name, shape in params:
-        size = np.prod(shape)	       
+        size = np.prod(shape)
         value = w[offset:offset + size]
-        setattr(module, name, value.view(shape).to(device))	
+        setattr(module, name, value.view(shape).to(device))
         offset += size

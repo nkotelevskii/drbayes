@@ -1,16 +1,16 @@
 import torch
 
-from ..utils import flatten, set_weights
 from .subspaces import Subspace
+from ..utils import flatten, set_weights
 
 
 class SWAG(torch.nn.Module):
 
     def __init__(self, base, subspace_type,
-                 subspace_kwargs=None, var_clamp=1e-6, *args, **kwargs):
+                 subspace_kwargs=None, var_clamp=1e-6):
         super(SWAG, self).__init__()
 
-        self.base_model = base(*args, **kwargs)
+        self.base_model = base
         self.num_parameters = sum(param.numel() for param in self.base_model.parameters())
 
         self.register_buffer('mean', torch.zeros(self.num_parameters))
@@ -27,7 +27,7 @@ class SWAG(torch.nn.Module):
 
         self.cov_factor = None
         self.model_device = 'cpu'
-        
+
     # dont put subspace on cuda?
     def cuda(self, device=None):
         self.model_device = 'cuda'
@@ -79,7 +79,7 @@ class SWAG(torch.nn.Module):
         eps_low_rank = torch.randn(self.cov_factor.size()[0])
         z = self.cov_factor.t() @ eps_low_rank
         if diag_noise:
-            z += variance * torch.randn_like(variance)
+            z += (variance ** 0.5) * torch.randn_like(variance)
         z *= scale ** 0.5
         sample = mean + z
 
