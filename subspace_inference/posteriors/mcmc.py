@@ -31,7 +31,7 @@ class MCMC_Proj(torch.nn.Module, metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def __init__(self, *args, **kwargs):
-        super(MCMC, self).__init__()
+        super(MCMC_Proj, self).__init__()
 
     # @abc.abstractmethod
     # def fit(self, mean, variance, cov_factor, *args, **kwargs):
@@ -42,9 +42,9 @@ class MCMC_Proj(torch.nn.Module, metaclass=abc.ABCMeta):
         pass
 
 
-@Inference.register_subclass('projected_sgld')
-class ProjSGLD(Inference):
-    def __init__(self, model, loader, criterion, epochs=10, cyclic=False, T=1, lr=1e-2 ** kwargs):
+@MCMC_Proj.register_subclass('projected_sgld')
+class ProjSGLD(MCMC_Proj):
+    def __init__(self, model, loader, criterion, mean, subspace, epochs = 10, cyclic= False, T = 1, lr = 1e-2,  **kwargs):
         super(ProjSGLD, self).__init__()
         self.kwargs = kwargs
         self.optimizer = None
@@ -68,12 +68,10 @@ class ProjSGLD(Inference):
             self.subspace = subspace
 
         if self.proj_params is None:
-            proj_params = torch.zeros(self.subspace.size(0), 1, dtype=self.subspace.dtype, device=self.subspace.device,
-                                      requires_grad=True)
-            print(proj_params.device)
-            self.proj_model = ProjectedModel(model=self.model, mean=self.mean.unsqueeze(1), projection=self.subspace,
-                                             proj_params=proj_params)
-
+            proj_params = torch.zeros(self.subspace.rank, 1, dtype = self.subspace.mean.dtype, device = self.subspace.mean.device, requires_grad = True)
+            #print(proj_params.device)
+            self.proj_model = ProjectedModel(model=self.model, mean=self.mean.unsqueeze(1),  projection=self.subspace, proj_params=proj_params)
+            
             # define optimizer
             self.optimizer = torch.optim.SGD([proj_params], lr)
 
@@ -95,10 +93,11 @@ class ProjSGLD(Inference):
         self.proj_params = proj_params
 
         return samples
-
-
-@Inference.register_subclass('vi')
-class VI(Inference):
+        
+    
+    
+@MCMC_Proj.register_subclass('vi')
+class VI(MCMC_Proj):
 
     def __init__(self, base, base_args, base_kwargs, rank, init_inv_softplus_simga=-6.0, prior_log_sigma=0.0):
         super(VI, self).__init__()
